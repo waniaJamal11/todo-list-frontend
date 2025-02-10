@@ -18,6 +18,7 @@ class Task {
       Task(id: 3, title: "Go for a walk", done: true),
       Task(id: 4, title: "Buy groceries"),
       Task(id: 5, title: "Workout for 30 minutes"),
+       
     ];
   }
 }
