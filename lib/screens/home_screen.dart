@@ -1,8 +1,11 @@
 // ignore_for_file: sort_child_properties_last, non_constant_identifier_names
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:todo_list/constants/constants.dart';
 import 'package:todo_list/models/task.dart';
+import 'package:todo_list/models/task_data.dart';
+import 'package:todo_list/services/database_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -12,31 +15,26 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final TextEditingController taskController = TextEditingController();
-  final List<Task> task = Task.task();
-  void addTask() {
-    if (taskController.text.isNotEmpty) {
-      setState(() {
-        task.add(Task(id: task.length + 1, title: taskController.text));
-        taskController.clear();
-      });
-    }
-  }
+  List<Task>? tasks;
 
-  void deleteTask(int index) {
-    setState(() {
-      task.removeAt(index);
-    });
-  }
-
-  void doneTask(int index) {
-    setState(() {
-      task[index].done = !task[index].done;
-    });
+  getTasks() async {
+    tasks = await DatabaseService.getTasks();
+    Provider.of<TaskData>(context, listen: false).tasks = tasks!;
+    setState(() {});
   }
 
   @override
+  void initState() {
+    super.initState();
+    getTasks();
+  }
+
+  final TextEditingController taskController = TextEditingController();
+
+  @override
   Widget build(BuildContext context) {
+    final taskData = Provider.of<TaskData>(context);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -51,46 +49,48 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: ConstantColor.secondary,
         foregroundColor: ConstantColor.primary,
       ),
-      body: Padding(
-        padding:
-            const EdgeInsets.only(top: 30, bottom: 10, right: 16, left: 16),
-        child: Column(children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              "Todo Tasks (${task.length})",
-              style: TextStyle(
-                fontSize: 25.0,
-                fontWeight: FontWeight.w700,
-                color: ConstantColor.primary,
-                letterSpacing: 0.5,
-              ),
+      body: tasks == null
+          ? const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(ConstantColor.primary),))
+          : Padding(
+              padding: const EdgeInsets.only(
+                  top: 30, bottom: 10, right: 16, left: 16),
+              child: Column(children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    "Todo Tasks (${tasks?.length})",
+                    style: TextStyle(
+                      fontSize: 25.0,
+                      fontWeight: FontWeight.w700,
+                      color: ConstantColor.primary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                TaskList(taskData),
+              ]),
             ),
-          ),
-          TaskList(),
-        ]),
-      ),
-      floatingActionButton: FloatingButton(),
+      floatingActionButton: FloatingButton(taskData),
     );
   }
 
-  Widget TaskList() {
+  Widget TaskList(TaskData taskData) {
     return Expanded(
         child: ListView.builder(
-            itemCount: task.length,
+            itemCount: tasks?.length,
             itemBuilder: (context, index) {
               return Card(
                 child: ListTile(
                   leading: Checkbox(
-                    value: task[index].done,
-                    onChanged: (value) => doneTask(index),
+                    value: tasks?[index].done,
+                    onChanged: (value) => taskData.updateTask(tasks![index]),
                     activeColor: Colors.transparent,
                     checkColor: ConstantColor.primary,
                   ),
                   title: Text(
-                    task[index].title,
+                    tasks![index].title,
                     style: TextStyle(
-                      decoration: task[index].done
+                      decoration: tasks![index].done
                           ? TextDecoration.lineThrough
                           : TextDecoration.none,
                     ),
@@ -100,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: IconButton(
                       icon: const Icon(Icons.delete,
                           color: ConstantColor.primary),
-                      onPressed: () => deleteTask(index),
+                      onPressed: () => taskData.deleteTask(tasks![index]),
                     ),
                   ),
                 ),
@@ -108,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
             }));
   }
 
-  Widget FloatingButton() {
+  Widget FloatingButton(TaskData taskData) {
     return FloatingActionButton(
       onPressed: () {
         showDialog(
@@ -131,8 +131,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       )),
                   TextButton(
                       onPressed: () {
-                        addTask();
-                        Navigator.pop(context);
+                        if (taskController.text.isNotEmpty) {
+                          taskData.addTask(taskController.text);
+                          taskController.clear();
+                          Navigator.pop(context);
+                        }
                       },
                       child: Text(
                         "Add",
